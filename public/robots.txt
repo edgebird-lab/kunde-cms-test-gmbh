@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+# Indexing / following of HTML documents is declared per page via <meta name="robots">.
+Sitemap: https://cms-test-gmbh.de/sitemap.xml

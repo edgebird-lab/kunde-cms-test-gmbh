@@ -1,0 +1,64 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Section from "../components/Section.astro";
+import Row     from "../components/Row.astro";
+import Column  from "../components/Column.astro";
+import BlockHeading from "../components/blocks/Heading.astro";
+
+const props = {
+  title: "Startseite",
+  description: "Testseite",
+  documentTitle: "Startseite | CMS Test GmbH",
+  brandName: "CMS Test GmbH",
+  pages: [{"slug":"startseite","title":"Startseite","isHome":true}],
+  flyoutPages: [],
+  primaryOrderedPages: [{"slug":"startseite","title":"Startseite","isHome":true}],
+  primaryOverlayOrderedPages: [{"slug":"startseite","title":"Startseite","isHome":true}],
+  secondaryPages: [],
+  contact: {},
+  showWhatsApp: false,
+  showCookieBanner: false,
+  fontImportUrl: "https://fonts.googleapis.com/css2?family=Barlow%20Condensed:wght@400;500;600;700;800;900&family=Mulish:wght@400;500;600;700;800;900&display=swap",
+  footer: {},
+  header: null,
+  navType: "top",
+  sidebarShowHamburger: false,
+  topShowHamburger: false,
+  seo: {"siteName":"CMS Test GmbH","siteUrl":"https://cms-test-gmbh.de","defaultTitlePattern":"{page} | {brand}","defaultDescription":"Testseite","robotsIndex":true,"robotsFollow":true,"orgType":"Organization","socialImage":{"src":null,"alt":""}},
+  canonicalUrl: "https://cms-test-gmbh.de",
+};
+const { title, description, documentTitle, brandName, pages, flyoutPages, primaryOrderedPages, primaryOverlayOrderedPages, secondaryPages, contact, showWhatsApp, showCookieBanner, fontImportUrl, footer, header, navType: layoutNavType, sidebarShowHamburger: layoutSidebarHam, topShowHamburger: layoutTopHam, seo, canonicalUrl } = props;
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  documentTitle={documentTitle}
+  brandName={brandName}
+  pages={pages}
+  flyoutPages={flyoutPages}
+  primaryOrderedPages={primaryOrderedPages}
+  primaryOverlayOrderedPages={primaryOverlayOrderedPages}
+  secondaryPages={secondaryPages}
+  contact={contact}
+  showWhatsApp={showWhatsApp}
+  showCookieBanner={showCookieBanner}
+  fontImportUrl={fontImportUrl}
+  footer={footer}
+  header={header}
+  navType={layoutNavType}
+  sidebarShowHamburger={layoutSidebarHam}
+  topShowHamburger={layoutTopHam}
+  seo={seo}
+  canonicalUrl={canonicalUrl}
+>
+
+<Section padding={"md"} fullWidth={true} label={""}>
+  <Row columnsTemplate={undefined} gap={"16px"} verticalAlign={"start"}>
+    <Column>
+      <div class="thunder-effect-target"><BlockHeading {...({"text":"Willkommen","level":1} as any)} /></div>
+    </Column>
+  </Row>
+</Section>
+
+</BaseLayout>

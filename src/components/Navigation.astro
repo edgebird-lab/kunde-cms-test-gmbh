@@ -1,0 +1,695 @@
+---
+/**
+ * Navigation — Top-Leiste, Sidebar oder Hamburger (Konfigurator + generierte Sites).
+ * Marke und Menü-Reihenfolge im DOM sind immer gleich; die Markenposition (Leiste)
+ * verschiebt nur die Marke innerhalb der ersten Spalte (Flex justify-content).
+ *
+ * `pages` = Primary Strip (Leiste); `flyoutPages` = nur Overlay ohne Strip (steuert Desktop-Flyout-Toggle);
+ * `primaryOrderedPages` = Strip ∪ Overlay (Mobil-Menü / Erreichbarkeit).
+ * `primaryOverlayOrderedPages` = nur Einträge mit Overlay-Sichtbarkeit (Desktop-Aufklapp-Panel bei top/sidebar).
+ */
+import NavBrandMark from "./NavBrandMark.astro";
+import type { NavHeaderConfig } from "./NavBrandMark.astro";
+
+export type { NavHeaderConfig };
+
+export type NavVariant = "top" | "sidebar" | "hamburger";
+
+export interface NavPageEntry {
+  slug: string;
+  title: string;
+  isHome?: boolean;
+}
+
+export interface Props {
+  brandName: string;
+  pages: NavPageEntry[];
+  /** Primary nur im Overlay, nicht in der Strip-Leiste (overlay-exklusiv). */
+  flyoutPages?: NavPageEntry[];
+  /** Primary union (Strip ∪ Overlay) — Mobil / volle Erreichbarkeit. */
+  primaryOrderedPages?: NavPageEntry[];
+  /** Primary nur mit „Aufklapp-Menü“-Sichtbarkeit — großes Panel auf Desktop (top/sidebar). Fehlt → wie primaryOrdered (Legacy). */
+  primaryOverlayOrderedPages?: NavPageEntry[];
+  /** Zweites Menüband (z. B. unter der Hauptzeile bei variant top). */
+  secondaryPages?: NavPageEntry[];
+  previewId?: string | null;
+  header?: NavHeaderConfig | null;
+  /** Konfigurator: top | sidebar | hamburger */
+  variant?: NavVariant;
+  /** Nur sinnvoll bei variant sidebar: Hamburger auch auf großen Viewports (wie schmale Sidebar-Ansicht). */
+  sidebarShowHamburger?: boolean;
+  /** Bei variant top: Hamburger-Toggle zusätzlich auf Desktop (horizontale Links bleiben sichtbar). */
+  topShowHamburger?: boolean;
+}
+
+const {
+  brandName,
+  pages,
+  flyoutPages: flyoutPagesRaw = [],
+  primaryOrderedPages: primaryOrderedRaw = [],
+  primaryOverlayOrderedPages: primaryOverlayOrderedRaw,
+  secondaryPages: secondaryPagesRaw = [],
+  previewId = null,
+  header: headerProp = null,
+  variant: variantProp = "top",
+  sidebarShowHamburger: sidebarHamRaw = false,
+  topShowHamburger: topHamRaw = false,
+} = Astro.props;
+
+const secondaryPages = Array.isArray(secondaryPagesRaw) ? secondaryPagesRaw : [];
+const flyoutPages = Array.isArray(flyoutPagesRaw) ? flyoutPagesRaw : [];
+const sidebarShowHamburger = !!sidebarHamRaw && variantProp === "sidebar";
+const topShowHamburger = !!topHamRaw && variantProp === "top";
+
+const variant: NavVariant =
+  variantProp === "sidebar" || variantProp === "hamburger" ? variantProp : "top";
+
+const primaryMenu = (() => {
+  if (Array.isArray(primaryOrderedRaw) && primaryOrderedRaw.length) return primaryOrderedRaw;
+  return [...pages, ...flyoutPages];
+})();
+
+/** Desktop-Aufklapp: nur Links mit Overlay; ohne Prop wie früher dieselbe Liste wie mobil (Legacy). */
+const primaryOverlayMenu =
+  primaryOverlayOrderedRaw !== undefined && Array.isArray(primaryOverlayOrderedRaw)
+    ? primaryOverlayOrderedRaw
+    : primaryMenu;
+
+/** Desktop: Panel-Toggle nötig wenn es Overlay-exklusive Links gibt (nur Overlay, kein Strip). */
+const desktopFlyout = flyoutPages.length > 0 && (variant === "top" || variant === "sidebar");
+const topAllCompact = variant === "top" && topShowHamburger;
+/**
+ * Nur Sidebar: bei „Hamburger zusätzlich“ ohne Flyout-only-Seiten Liste ausblenden (alles im Panel).
+ * Top + Hamburger: Leiste bleibt immer sichtbar; Toggle ergänzt nur das Aufklapp-Panel (wie bei Flyout-Mix).
+ */
+const compactAllInPanel =
+  flyoutPages.length === 0 && sidebarShowHamburger && variant === "sidebar";
+
+const header = headerProp || {};
+const rawNavPct = Number(header.brandAlignPct);
+let brandNavPct = Number.isFinite(rawNavPct) ? Math.min(100, Math.max(0, rawNavPct)) : NaN;
+if (!Number.isFinite(brandNavPct)) {
+  if (header.brandAlign === "center") brandNavPct = 50;
+  else if (header.brandAlign === "end") brandNavPct = 100;
+  else brandNavPct = 0;
+}
+const brandJustify: "start" | "center" | "end" =
+  brandNavPct <= 33 ? "start" : brandNavPct >= 67 ? "end" : "center";
+const brandFlexJustify =
+  brandJustify === "start" ? "flex-start" : brandJustify === "end" ? "flex-end" : "center";
+/** Volle Spaltenbreite, Marke darin per Flex verschieben (justify-self nützt nicht bei width:100%). */
+const brandSlotStyle = {
+  display: "flex",
+  justifyContent: brandFlexJustify,
+  minWidth: "0",
+  width: "100%",
+};
+
+const homeSlug =
+  primaryMenu.find((p) => p.isHome)?.slug ??
+  secondaryPages.find((p) => p.isHome)?.slug ??
+  primaryMenu[0]?.slug ??
+  secondaryPages[0]?.slug ??
+  "";
+const linkHref = (slug: string, isHome?: boolean) =>
+  previewId
+    ? `/preview?id=${encodeURIComponent(previewId)}&page=${encodeURIComponent(slug)}`
+    : isHome
+      ? "/"
+      : `/${slug}`;
+const brandHref = previewId ? linkHref(homeSlug, true) : "/";
+const fallbackTitle = primaryMenu[0]?.title || secondaryPages[0]?.title || "Startseite";
+
+const hasSecondary = secondaryPages.length > 0;
+---
+
+<header
+  id="od-site-nav"
+  class:list={[
+    "nav-root",
+    `nav-root--${variant}`,
+    sidebarShowHamburger && "nav-root--sidebar-compact",
+    topAllCompact && "nav-root--top-all-compact",
+    compactAllInPanel && "nav-root--compact-all-in-panel",
+    desktopFlyout && "nav-root--desktop-flyout",
+  ]}
+  data-nav-secondary={hasSecondary && (variant === "top" || variant === "hamburger") ? "1" : undefined}
+>
+  <div class:list={["nav-inner", variant === "sidebar" ? "nav-inner--sidebar" : "nav-inner--topbar"]}>
+    <div class="nav-brand-slot" style={brandSlotStyle}>
+      <NavBrandMark brandName={brandName} fallbackTitle={fallbackTitle} brandHref={brandHref} header={headerProp} />
+    </div>
+    <div class="nav-links-slot">
+      <nav aria-label="Hauptnavigation">
+        <ul class:list={["nav-list", "nav-list--primary"]}>
+          {
+            pages.map((p) => (
+              <li>
+                <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+      {
+        variant === "sidebar" && hasSecondary ? (
+          <nav aria-label="Zweitmenü" class="nav-secondary-inline">
+            <ul class:list={["nav-list", "nav-list--secondary"]}>
+              {secondaryPages.map((p) => (
+                <li>
+                  <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : null
+      }
+      <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-controls="mobile-menu" aria-expanded="false">
+        <span />
+        <span />
+        <span />
+      </button>
+    </div>
+  </div>
+
+  {
+    variant === "top" && hasSecondary ? (
+      <div class="nav-secondary-row">
+        <div class="nav-secondary-row__inner">
+          <nav aria-label="Zweitmenü">
+            <ul class:list={["nav-list", "nav-list--secondary"]}>
+              {secondaryPages.map((p) => (
+                <li>
+                  <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    ) : null
+  }
+
+  {
+    variant === "hamburger" && hasSecondary ? (
+      <div class="nav-secondary-row nav-secondary-row--hamburger">
+        <div class="nav-secondary-row__inner">
+          <nav aria-label="Zweitmenü">
+            <ul class:list={["nav-list", "nav-list--secondary"]}>
+              {secondaryPages.map((p) => (
+                <li>
+                  <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    ) : null
+  }
+
+  <div id="mobile-menu" class="nav-mobile" hidden>
+    {
+      variant === "hamburger" ? (
+        <ul class="nav-mobile__primary">
+          {
+            primaryMenu.map((p) => (
+              <li>
+                <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+              </li>
+            ))
+          }
+        </ul>
+      ) : (
+        <>
+          <ul class:list={["nav-mobile__primary", "nav-mobile__primary--reachability"]}>
+            {
+              primaryMenu.map((p) => (
+                <li>
+                  <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+                </li>
+              ))
+            }
+          </ul>
+          <ul class:list={["nav-mobile__primary", "nav-mobile__primary--overlay-desktop"]}>
+            {
+              primaryOverlayMenu.map((p) => (
+                <li>
+                  <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+                </li>
+              ))
+            }
+          </ul>
+        </>
+      )
+    }
+    {
+      hasSecondary ? (
+        <>
+          <p class="nav-mobile__divider">Weitere Links</p>
+          <ul class="nav-mobile__secondary">
+            {secondaryPages.map((p) => (
+              <li>
+                <a href={linkHref(p.slug, p.isHome)}>{p.title}</a>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null
+    }
+  </div>
+</header>
+
+<script is:inline>
+  (function () {
+    const root = document.getElementById("od-site-nav");
+    if (!root) return;
+    const btn = root.querySelector(".nav-toggle");
+    const menu = root.querySelector("#mobile-menu");
+    const primaryList = root.querySelector(".nav-list--primary");
+
+    function syncPrimaryOverflowCollapse() {
+      if (!primaryList || root.classList.contains("nav-root--sidebar") || root.classList.contains("nav-root--hamburger")) {
+        root.classList.remove("nav-root--primary-collapsed");
+        return;
+      }
+      const pad = 2;
+      const overflow = primaryList.scrollWidth > primaryList.clientWidth + pad;
+      root.classList.toggle("nav-root--primary-collapsed", overflow);
+    }
+
+    syncPrimaryOverflowCollapse();
+    const stripHiddenEntirely =
+      root.classList.contains("nav-root--top-all-compact") &&
+      root.classList.contains("nav-root--compact-all-in-panel");
+    if (
+      primaryList &&
+      root.classList.contains("nav-root--top") &&
+      !stripHiddenEntirely
+    ) {
+      const ro = new ResizeObserver(() => syncPrimaryOverflowCollapse());
+      ro.observe(primaryList);
+      const slot = primaryList.closest(".nav-links-slot");
+      if (slot) ro.observe(slot);
+      window.addEventListener("resize", syncPrimaryOverflowCollapse);
+    }
+
+    btn?.addEventListener("click", () => {
+      if (!menu) return;
+      const open = menu.hidden;
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+    });
+  })();
+</script>
+
+<style>
+  :root {
+    --nav-sidebar-width: 260px;
+  }
+
+  .nav-root {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--nav) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    color: var(--nav-text, var(--text));
+  }
+
+  /* ─── Top (Standard): Marke | Links — Marke nur innerhalb der linken Spalte verschieben ─── */
+  .nav-root--top .nav-inner--topbar {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding: 1rem var(--section-padding-x);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+  }
+  .nav-root--top .nav-brand-slot {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  .nav-brand-slot > * {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
+  .nav-root--top .nav-links-slot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .nav-secondary-row {
+    border-top: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  }
+  .nav-secondary-row__inner {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding: 0.4rem var(--section-padding-x) 0.75rem;
+  }
+  .nav-root--hamburger .nav-secondary-row--hamburger {
+    border-top: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  }
+  .nav-root--hamburger .nav-secondary-row--hamburger .nav-secondary-row__inner {
+    padding-top: 0.35rem;
+  }
+
+  .nav-secondary-inline {
+    width: 100%;
+  }
+
+  /* ─── Sidebar (Desktop): fixe linke Spalte ─── */
+  .nav-root--sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--nav-sidebar-width);
+    z-index: 60;
+    border-right: 1px solid var(--line);
+    border-bottom: none;
+    overflow-y: auto;
+  }
+  .nav-root--sidebar .nav-inner--sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.25rem;
+    padding: 1.25rem 1rem;
+    min-height: min-content;
+  }
+  .nav-root--sidebar .nav-brand-slot {
+    min-width: 0;
+    width: 100%;
+    align-self: stretch;
+  }
+  .nav-root--sidebar .nav-links-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .nav-root--sidebar .nav-list {
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: flex-start;
+  }
+  .nav-root--sidebar .nav-list--secondary {
+    padding-top: 0.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  }
+
+  /* Sidebar + „Hamburger zusätzlich“: nur wenn alle Primary in der Leiste sind (keine Flyout-only-Seiten):
+     gesamtes Menü nur im Panel. Sobald mindestens eine Seite „nur Aufklapp“ hat, bleibt der Strip sichtbar. */
+  .nav-root--sidebar.nav-root--sidebar-compact.nav-root--compact-all-in-panel .nav-list--primary,
+  .nav-root--sidebar.nav-root--sidebar-compact.nav-root--compact-all-in-panel .nav-list--secondary {
+    display: none !important;
+  }
+  .nav-root--sidebar.nav-root--sidebar-compact.nav-root--compact-all-in-panel .nav-secondary-inline {
+    display: none !important;
+  }
+  .nav-root--sidebar.nav-root--sidebar-compact .nav-toggle {
+    display: flex !important;
+  }
+  .nav-root--sidebar.nav-root--sidebar-compact .nav-mobile:not([hidden]) {
+    display: block;
+  }
+
+  /* Top + „Hamburger zusätzlich“: horizontale Links bleiben; Toggle öffnet zusätzlich das Panel */
+  .nav-root--top.nav-root--top-all-compact .nav-toggle {
+    display: flex !important;
+  }
+  .nav-root--top.nav-root--top-all-compact .nav-mobile:not([hidden]) {
+    display: block;
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: var(--nav-flyout-top, 4.25rem);
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+    z-index: 55;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Primary mit Flyout-only-Links: Toggle auch auf Desktop (volles Menü im Panel) */
+  .nav-root--desktop-flyout.nav-root--top .nav-toggle,
+  .nav-root--desktop-flyout.nav-root--sidebar .nav-toggle {
+    display: flex !important;
+  }
+  .nav-root--desktop-flyout.nav-root--top .nav-mobile:not([hidden]) {
+    display: block;
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: var(--nav-flyout-top, 4.25rem);
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+    z-index: 55;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+  }
+  .nav-root--desktop-flyout.nav-root--sidebar .nav-mobile:not([hidden]) {
+    display: block;
+  }
+
+  /* ─── Hamburger: Menü-Icon immer, Liste ausgeblendet (alle Viewports) ─── */
+  .nav-root--hamburger .nav-list--primary {
+    display: none !important;
+  }
+  .nav-root--hamburger .nav-toggle {
+    display: flex !important;
+  }
+  .nav-root--hamburger .nav-inner--topbar {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding: 1rem var(--section-padding-x);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+  }
+  .nav-root--hamburger .nav-brand-slot {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+  .nav-root--hamburger .nav-links-slot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+
+  .nav-list {
+    list-style: none;
+    display: flex;
+    gap: 1.75rem;
+    margin: 0;
+    padding: 0;
+  }
+  .nav-list a {
+    color: var(--nav-text, var(--text));
+    opacity: 0.92;
+    font-size: var(--fs-sm);
+    transition: color var(--transition-fast), opacity var(--transition-fast);
+  }
+  .nav-list--secondary a {
+    font-size: calc(var(--fs-sm) * 0.94);
+    opacity: 0.88;
+  }
+  .nav-list a:hover {
+    color: var(--accent);
+    opacity: 1;
+  }
+
+  .nav-toggle {
+    display: none;
+    background: transparent;
+    border: 0;
+    width: 36px;
+    height: 36px;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 8px 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nav-toggle span {
+    display: block;
+    height: 2px;
+    background: var(--nav-text, var(--text));
+    border-radius: 2px;
+  }
+
+  .nav-mobile {
+    display: none;
+    border-top: 1px solid var(--line);
+  }
+  .nav-mobile__primary,
+  .nav-mobile__secondary {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+  .nav-mobile__divider {
+    margin: 0;
+    padding: 0.35rem var(--section-padding-x) 0.15rem;
+    font-size: var(--fs-xs, 0.75rem);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--nav-text, var(--text)) 55%, transparent);
+    border-top: 1px solid var(--line);
+  }
+  .nav-mobile li a {
+    display: block;
+    padding: 0.85rem var(--section-padding-x);
+    color: var(--nav-text, var(--text));
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* top/sidebar: schmale Viewports = volle Primary-Liste; Desktop-Panel = nur Overlay-Häkchen */
+  .nav-mobile__primary--overlay-desktop {
+    display: none;
+  }
+  @media (min-width: 769px) {
+    .nav-root:not(.nav-root--hamburger) .nav-mobile__primary--reachability {
+      display: none !important;
+    }
+    .nav-root:not(.nav-root--hamburger) .nav-mobile__primary--overlay-desktop {
+      display: block;
+    }
+  }
+
+  .nav-root--hamburger .nav-mobile:not([hidden]) {
+    display: block;
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: var(--nav-flyout-top, 4.25rem);
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+    z-index: 55;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Desktop: Hauptmenü überläuft → Hamburger (ResizeObserver setzt .nav-root--primary-collapsed) */
+  .nav-root--top.nav-root--primary-collapsed .nav-list--primary {
+    display: none;
+  }
+  .nav-root--top.nav-root--primary-collapsed .nav-toggle {
+    display: flex;
+  }
+  .nav-root--top.nav-root--primary-collapsed .nav-mobile:not([hidden]) {
+    display: block;
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: var(--nav-flyout-top, 4.25rem);
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+    z-index: 55;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .nav-root--top[data-nav-secondary].nav-root--primary-collapsed,
+  .nav-root--top[data-nav-secondary].nav-root--desktop-flyout,
+  .nav-root--top[data-nav-secondary].nav-root--top-all-compact,
+  .nav-root--hamburger[data-nav-secondary] {
+    --nav-flyout-top: 6.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .nav-root--top .nav-list--primary {
+      display: none;
+    }
+    .nav-root--top .nav-toggle {
+      display: flex;
+    }
+    .nav-root--top .nav-mobile:not([hidden]) {
+      display: block;
+    }
+
+    .nav-root--sidebar {
+      position: sticky;
+      width: 100%;
+      max-width: var(--container-max);
+      margin-inline: auto;
+      top: 0;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-root--sidebar .nav-inner--sidebar {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 1rem var(--section-padding-x);
+      max-width: var(--container-max);
+      margin-inline: auto;
+    }
+    .nav-root--sidebar .nav-brand-slot {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .nav-root--sidebar .nav-links-slot {
+      flex-direction: row;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .nav-root--sidebar .nav-list--primary,
+    .nav-root--sidebar .nav-list--secondary {
+      display: none;
+    }
+    .nav-root--sidebar .nav-secondary-inline {
+      display: none;
+    }
+    .nav-root--sidebar .nav-toggle {
+      display: flex;
+    }
+    .nav-root--sidebar .nav-mobile:not([hidden]) {
+      display: block;
+    }
+
+    .nav-root--top .nav-secondary-row {
+      display: none;
+    }
+    .nav-root--hamburger .nav-secondary-row--hamburger {
+      display: none;
+    }
+
+    .nav-root--top .nav-mobile:not([hidden]),
+    .nav-root--top.nav-root--primary-collapsed .nav-mobile:not([hidden]) {
+      position: static;
+      left: auto;
+      right: auto;
+      top: auto;
+      max-height: none;
+      box-shadow: none;
+      border-radius: 0;
+      background: transparent;
+      border-left: none;
+      border-right: none;
+    }
+  }
+</style>

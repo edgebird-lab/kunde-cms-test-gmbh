@@ -1,0 +1,38 @@
+{
+  "builtAt": "2026-05-20T12:32:36.267Z",
+  "schemaVersion": "4.0",
+  "brand": "CMS Test GmbH",
+  "slug": "cms_test_gmbh",
+  "pages": [
+    {
+      "slug": "startseite",
+      "title": "Startseite",
+      "isHome": true
+    }
+  ],
+  "blocks": [
+    "heading"
+  ],
+  "appearance": {
+    "themeId": "industrial-orange",
+    "fonts": {
+      "heading": "Barlow Condensed",
+      "body": "Mulish"
+    },
+    "radius": 4,
+    "navigation": {
+      "type": "top"
+    },
+    "tokens": {
+      "bg": "#0d0d0d",
+      "text": "#f8fafc",
+      "surface": "#0d0d0d",
+      "nav": "#0d0d0d",
+      "navText": "#f8fafc"
+    }
+  },
+  "footer": {},
+  "features": [
+    "cms"
+  ]
+}

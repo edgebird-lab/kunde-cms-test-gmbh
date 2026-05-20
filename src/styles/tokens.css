@@ -1,0 +1,20 @@
+/* Auto-generiert von builder/src/tokens.ts — manuelle Änderungen werden überschrieben. */
+:root {
+  --bg: #0d0d0d !important;
+  --bg2: #050505 !important;
+  --bg3: #1a1a1a !important;
+  --surface: #0d0d0d !important;
+  --nav: #0d0d0d !important;
+  --text: #f8fafc !important;
+  --muted: #b8babc !important;
+  --nav-text: #f8fafc !important;
+  --font-display: 'Barlow Condensed', system-ui, sans-serif;
+  --font-main: 'Mulish', system-ui, sans-serif;
+  --font-body: 'Mulish', system-ui, sans-serif;
+  --radius: 4px;
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --bg-pattern: none;
+  --bg-image-overlay: none;
+}

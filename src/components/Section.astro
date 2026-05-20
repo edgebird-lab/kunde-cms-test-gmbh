@@ -1,0 +1,37 @@
+---
+export interface Props {
+  padding?: 'none'|'sm'|'md'|'lg';
+  fullWidth?: boolean;
+  background?: { color?: string|null; image?: string|null; overlay?: number|null } | null;
+  label?: string;
+  [key: string]: unknown;
+}
+const { padding = 'lg', fullWidth = true, background = null, label = '', ...rest } = Astro.props;
+const padMap: Record<string, string> = { none: '0', sm: '20px 5vw', md: '36px 5vw', lg: '56px 5vw' };
+const bgStyle: string[] = [];
+if (background?.color) bgStyle.push(`background-color: ${background.color}`);
+if (background?.image) {
+  bgStyle.push(`background-image: url('${background.image}')`);
+  bgStyle.push(`background-size: cover`);
+  bgStyle.push(`background-position: center`);
+}
+const overlayPct = background?.overlay ?? 0;
+const showOverlay = !!(background?.image && overlayPct > 0);
+---
+<section
+  class={`thunder-section ${fullWidth ? 'sec-full' : 'sec-narrow'}`}
+  data-label={label}
+  style={`padding:${padMap[padding] || padMap.md}; ${bgStyle.join(';')}`}
+  {...rest}
+>
+  {showOverlay && <div class="thunder-section-overlay" style={`background: rgba(0,0,0, ${overlayPct/100})`}></div>}
+  <div class="thunder-section-inner">
+    <slot />
+  </div>
+</section>
+<style>
+  .thunder-section { position: relative; color: var(--text); }
+  .thunder-section-overlay { position: absolute; inset: 0; pointer-events: none; }
+  .thunder-section-inner { position: relative; z-index: 1; }
+  .sec-narrow .thunder-section-inner { max-width: var(--container-max); margin-inline: auto; }
+</style>
